@@ -3,7 +3,7 @@ from collections import defaultdict
 import inflect  # To convert plural job titles to singular
 
 # Path to O*NET data files
-ONET_DIR = "final"
+ONET_DIR = "4440final"
 
 # Filenames inside the O*NET directory
 occupation_file = f"{ONET_DIR}/Occupation_Data.txt"

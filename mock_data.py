@@ -5,10 +5,10 @@ from faker import Faker
 from similarity import job_title_similarity_sbert
 
 # Load the job to skills map and education-job map from generated files
-with open('final/job_skill_map.json', 'r') as f:
+with open('4440final/job_skill_map.json', 'r') as f:
     job_skill_map = json.load(f)
 
-with open('final/education_job_map.json', 'r') as f:
+with open('4440final/education_job_map.json', 'r') as f:
     education_job_map = json.load(f)
 
 # Initialize Faker

@@ -9,7 +9,7 @@ import numpy as np
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Load the job match JSON from generated files
-with open('final/job_match.json', 'r') as f:
+with open('4440final/job_match.json', 'r') as f:
     job_match = json.load(f)
 
 def resume_to_text(resume):
@@ -65,8 +65,46 @@ def evaluate_candidate(resume, job):
         "risk_flags": risks
     }
 
-resume = generate_resume()
-job = generate_job_posting()
+# resume = generate_resume()
+# job = generate_job_posting()
+
+job = {
+  "title": "Hydroelectric Plant Technician",
+  "required_skills": ["Equipment Maintenance", "Operation Monitoring", "Mechanical Knowledge", "Critical Thinking"],
+  "minimum_experience": 4,
+  "required_education": "Engineering"
+}
+
+resume = {
+  "name": "Kendra Patel",
+  "email": "kendrapatel92@example.org",
+  "education": "Mechanical Engineering",
+  "skills": ["Operation Monitoring", "Mechanical Knowledge", "Equipment Maintenance", "Critical Thinking", "Troubleshooting", "Monitoring", "Coordination", "Repairing"],
+  "experience": [
+    {
+      "title": "Power Plant Operator",
+      "company": "EverGreen Energy Systems",
+      "start_year": 2021,
+      "end_year": 2025,
+      "skills": ["Operation Monitoring", "Mechanical Knowledge", "Repairing"]
+    },
+    {
+      "title": "Industrial Machinery Mechanic",
+      "company": "Nexus HydroTech",
+      "start_year": 2018,
+      "end_year": 2021,
+      "skills": ["Equipment Maintenance", "Troubleshooting", "Critical Thinking", "Coordination"]
+    },
+    {
+      "title": "Maintenance Technician",
+      "company": "Cascade Utilities Corp.",
+      "start_year": 2016,
+      "end_year": 2018,
+      "skills": ["Repairing", "Monitoring", "Mechanical Knowledge"]
+    }
+  ]
+}
+
 
 print(job, '\n\n', resume)
 
