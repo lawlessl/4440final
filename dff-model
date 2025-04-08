@@ -1,0 +1,277 @@
+import json
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, BatchNormalization
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras import regularizers
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.metrics import mean_squared_error
+from sentence_transformers import SentenceTransformer
+from transformers import T5Tokenizer, T5ForConditionalGeneration, BartTokenizer, BartForConditionalGeneration
+import torch
+import random
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+
+# Load the job match JSON from generated files
+with open('final/generated_dataset.json', 'r') as f:
+    job_match = json.load(f)
+
+# Function to convert resume to text
+def resume_to_text(resume):
+    exp_str = "\n".join([f"{e['title']} at {e['company']} ({e['start_year']}-{e['end_year']})" for e in resume["experience"]])
+    skills = ", ".join(resume["skills"])
+    return f"{resume['education']}\nSkills: {skills}\nExperience:\n{exp_str}"
+
+# Function to convert job posting to text
+def job_to_text(job):
+    skills = ", ".join(job["required_skills"])
+    return f"{job['title']}\nRequired Skills: {skills}\nExperience: {job['minimum_experience']} years\nEducation: {job['required_education']}"
+
+# Prepare dataset
+def prepare_dataset(data):
+    resume_texts = [resume_to_text(d["resume"]) for d in data]
+    job_texts = [job_to_text(d["job"]) for d in data]
+    pairs = [r + "\n\n" + j for r, j in zip(resume_texts, job_texts)]
+    embeddings = model.encode(pairs)  # Generate embeddings
+    labels = [d["label"] for d in data]  # Labels (match score)
+    return np.array(embeddings), np.array(labels)
+
+# Prepare data
+X, y = prepare_dataset(job_match)
+
+# Neural Network Model with Batch Normalization and regularization
+def create_nn_model(input_dim):
+    model = Sequential([
+        Dense(128, input_dim=input_dim, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        BatchNormalization(),
+        Dense(64, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        BatchNormalization(),
+        Dense(32, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        Dense(1, activation='linear')  # Output layer, single neuron for regression (match score)
+    ])
+    model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error', metrics=['mae'])
+    return model
+
+# Cross-validation setup (5-fold)
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+# Callbacks
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6)
+
+# K-fold cross-validation training
+fold = 1
+for train_index, val_index in kf.split(X):
+    X_train, X_val = X[train_index], X[val_index]
+    y_train, y_val = y[train_index], y[val_index]
+    
+    # Define model for each fold
+    input_dim = X_train.shape[1]  # Number of features (embedding dimension)
+    model_nn = create_nn_model(input_dim)
+    
+    # Train the model
+    print(f"Training fold {fold}...")
+    model_nn.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_val, y_val), 
+                 callbacks=[early_stopping, lr_scheduler])
+    
+    # Predict and evaluate on the validation set
+    preds = model_nn.predict(X_val)
+    rmse = np.sqrt(mean_squared_error(y_val, preds))
+    print(f"Fold {fold} RMSE: {rmse}")
+    
+    fold += 1
+
+# Final evaluation after training
+final_model = create_nn_model(input_dim)
+final_model.fit(X, y, epochs=50, batch_size=32, validation_split=0.2, 
+                callbacks=[early_stopping, lr_scheduler])
+
+# Evaluate the final model
+preds = final_model.predict(X)
+rmse = np.sqrt(mean_squared_error(y, preds))
+print(f"Final RMSE on all data: {rmse}")
+
+# Example evaluation for a new resume-job pair
+def evaluate_candidate_nn(resume, job):
+    combined = resume_to_text(resume) + "\n\n" + job_to_text(job)
+    embedding = model.encode([combined])
+
+    # Make prediction using the trained neural network
+    fit_score = final_model.predict(embedding)[0][0]
+    return {
+        "fit_score": round(fit_score, 2)
+    }
+
+
+# # Function to generate resumes with varying degrees of relevance
+# def generate_example_resumes(job_description):
+#     resumes = []
+#     # Generate 10 example resumes with varying relevance
+#     for i in range(10):
+#         # Resume structure
+#         resume = {
+#             "name": f"Candidate {i + 1}",
+#             "email": f"candidate{i + 1}@example.com",
+#             "education": job_description["required_education"],  # All candidates have required education
+#             "experience": [],
+#             "skills": []
+#         }
+
+#         if i < 5:  # These will be related resumes (more relevant to the job description)
+#             resume["skills"] = random.sample(job_description["required_skills"], 3)  # 3 relevant skills
+#             # Adding related experience
+#             resume["experience"] = [
+#                 {
+#                     "title": "Software Engineer",
+#                     "company": f"Company {i + 1}",
+#                     "start_year": 2022,
+#                     "end_year": 2025,
+#                     "skills": random.sample(job_description["required_skills"], 3)  # Relevant skills
+#                 }
+#             ]
+#         else:  # These will be unrelated resumes (less relevant)
+#             resume["skills"] = random.sample(["Marketing", "Sales", "HR", "Design", "Management"], 3)  # Unrelated skills
+#             # Adding unrelated experience
+#             resume["experience"] = [
+#                 {
+#                     "title": "Marketing Manager",
+#                     "company": f"Company {i + 1}",
+#                     "start_year": 2020,
+#                     "end_year": 2023,
+#                     "skills": ["Marketing", "Branding", "SEO"]
+#                 }
+#             ]
+        
+#         resumes.append(resume)
+
+#     return resumes
+
+# Function to evaluate fit score for multiple resumes
+def evaluate_fit_scores_for_resumes(resumes, job_description):
+    fit_scores = []
+    for resume in resumes:
+        result = evaluate_candidate_nn(resume, job_description)  # Assuming this function is already defined
+        fit_scores.append({
+            "name": resume["name"],
+            "fit_score": result["fit_score"]
+        })
+    return fit_scores
+
+
+# Define a job description
+job = {
+    "title": "Software Engineer",
+    "required_skills": ["Python", "Java", "SQL", "Git"],
+    "minimum_experience": 2,
+    "required_education": "Computer Science"
+}
+
+# Generate 10 example resumes
+# example_resumes = generate_example_resumes(job)
+
+example_resumes = [
+    {
+  "name": "Alex Ramirez",
+  "email": "alex.ramirez@example.com",
+  "education": "Hospitality Management",
+  "skills": [
+    "Espresso Machine Operation",
+    "Customer Service",
+    "Latte Art",
+    "Cash Handling",
+    "POS Systems",
+    "Inventory Management"
+  ],
+  "experience": [
+    {
+      "title": "Barista",
+      "company": "Bean & Brew Café",
+      "start_year": 2021,
+      "end_year": 2024,
+      "skills": [
+        "Espresso Machine Operation",
+        "Latte Art",
+        "Customer Service"
+      ]
+    },
+    {
+      "title": "Cafe Team Member",
+      "company": "Urban Grounds",
+      "start_year": 2019,
+      "end_year": 2021,
+      "skills": [
+        "POS Systems",
+        "Cash Handling",
+        "Inventory Management"
+      ]
+    }
+  ]
+},
+    {
+  "name": "Dr. Emma Williams",
+  "email": "emma.williams@example.com",
+  "education": "PhD in Biology",
+  "skills": [
+    "Ecological Research",
+    "Laboratory Techniques",
+    "Data Analysis",
+    "Species Identification",
+    "Field Work",
+    "Biostatistics",
+    "Scientific Writing",
+    "Microscopy"
+  ],
+  "experience": [
+    {
+      "title": "Ecologist",
+      "company": "Green Earth Conservation",
+      "start_year": 2020,
+      "end_year": 2024,
+      "skills": [
+        "Ecological Research",
+        "Field Work",
+        "Species Identification",
+        "Data Analysis"
+      ]
+    },
+    {
+      "title": "Research Assistant",
+      "company": "University of Biology",
+      "start_year": 2017,
+      "end_year": 2020,
+      "skills": [
+        "Laboratory Techniques",
+        "Microscopy",
+        "Scientific Writing",
+        "Biostatistics"
+      ]
+    },
+    {
+      "title": "Biology Intern",
+      "company": "Wildlife Preservation Institute",
+      "start_year": 2015,
+      "end_year": 2017,
+      "skills": [
+        "Field Work",
+        "Species Identification",
+        "Data Collection"
+      ]
+    }
+  ]
+}
+
+]
+
+# Evaluate the fit scores for all the resumes
+fit_scores = evaluate_fit_scores_for_resumes(example_resumes, job)
+
+# Print the results
+for score in fit_scores:
+    print(f"Resume: {score['name']} - Fit Score: {score['fit_score']}")
+
+
+
