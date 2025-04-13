@@ -1,0 +1,173 @@
+import pandas as pd
+import numpy as np
+
+
+df = pd.read_csv("/Users/CookS21/Desktop/4440final/resume_dataset_with_job_role_skills.csv")
+
+
+# Load your dataset (replace with the correct path if needed)
+# resume_job_role_skills_df = pd.read_csv('path_to_your_file.csv')
+
+# Set a seed for reproducibility
+np.random.seed(42)
+
+# Step 1: Get the number of unique job descriptions
+unique_job_roles = df['job_role'].unique()
+
+# Step 2: Sample 1000 resumes for each unique job description
+samples_per_job_description = 1000
+expanded_data = []
+
+for job_role in unique_job_roles:
+    # Filter rows for the current job role
+    job_role_data = df[df['job_role'] == job_role]
+    
+    # Randomly sample 1000 resumes from this subset (with replacement)
+    sampled_resumes = job_role_data.sample(n=samples_per_job_description, replace=True)
+    
+    # Add sampled data to the expanded data list
+    expanded_data.append(sampled_resumes)
+
+# Step 3: Combine the sampled data
+expanded_df = pd.concat(expanded_data, ignore_index=True)
+
+# Step 4: Add this expanded data to the original dataset
+final_combined_df = pd.concat([df, expanded_df], ignore_index=True)
+
+# Display the number of rows in the final dataset
+print(f"Total number of rows in the final dataset: {final_combined_df.shape[0]}")
+
+# Display the first few rows of the updated dataset
+print(final_combined_df)  # You can adjust to display more rows if needed
+
+
+
+# Optionally, save to a new CSV file
+# final_combined_df.to_csv('expanded_resume_job_mapping.csv', index=False)
+
+
+# dfjobdescription = df[["job_role", "job_description", "skills", "responsibilities"]]
+# # dfjobdescription = dfjobdescription.drop_duplicates()
+# # print(dfjobdescription)
+
+
+# dfresume = df[["job_bullets", "applicant_job_role", "applicant_skills"]]
+# # print(dfresume)
+
+# dfresume = dfresume.copy()
+# dfjobdescription = dfjobdescription.copy()
+
+# dfresume['key'] = 1
+# dfjobdescription['key'] = 1
+
+# # Merge the two datasets based on the key to get every resume matched with every job description
+# combined_df = pd.merge(dfresume, dfjobdescription, on='key').drop('key', axis=1)
+
+# print(combined_df)
+
+# combined_df.to_csv("finaldatasetbeforematching.csv")
+# # dfresume.to_csv("dfresumes.csv")
+# # dfjobdescription.to_csv("dfjobdescriptions.csv")
+
+
+
+
+
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import pandas as pd
+
+# Load pre-trained SBERT model
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def job_title_similarity_sbert(title1, title2):
+    """Calculate cosine similarity between two job titles using SBERT."""
+    embedding1 = model.encode([title1])[0]
+    embedding2 = model.encode([title2])[0]
+    return cosine_similarity([embedding1], [embedding2])[0][0]
+
+def responsibilities_similarity(responsibilities, job_bullets):
+    """Compare job description responsibilities with resume job bullets using cosine similarity."""
+    embedding_responsibilities = model.encode([responsibilities])[0]
+    embedding_job_bullets = model.encode([job_bullets])[0]
+    
+    return cosine_similarity([embedding_responsibilities], [embedding_job_bullets])[0][0]
+
+def compute_job_title_match(job, resume):
+    """Compute the job title match score."""
+    job_title_sim = job_title_similarity_sbert(resume["applicant_job_role"], job["job_role"])
+    return job_title_sim
+
+def compute_skills_match(job, resume):
+    """Compute the skills match score."""
+    skills_match = len(set(job["job_skills"]).intersection(set(resume["applicant_skills"]))) / len(job["job_skills"]) if job["job_skills"] else 0
+    return skills_match
+
+def compute_responsibilities_match(job, resume):
+    """Compute the responsibilities match score."""
+    responsibilities_in_job = job.get("job_responsibilities", "")
+    job_bullets_in_resume = " ".join(resume["applicant_experience"])  # Assuming it's a list of strings in resume['applicant_experience']
+    return responsibilities_similarity(responsibilities_in_job, job_bullets_in_resume)
+
+def compute_match_scores(resume, job):
+    """Compute the match scores for job title, skills, and responsibilities."""
+    # Compute individual match scores
+    job_title_score = compute_job_title_match(job, resume)
+    skills_score = compute_skills_match(job, resume)
+    responsibilities_score = compute_responsibilities_match(job, resume)
+    
+    return {
+        "job_title_match_score": job_title_score,
+        "skills_match_score": skills_score,
+        "responsibilities_match_score": responsibilities_score
+    }
+
+def compute_match_scores_for_combined_data(combined_df, output_file_path):
+    match_results = []
+    
+    # Loop through the combined dataframe to calculate match scores for each row
+    for index, row in combined_df.iterrows():
+        resume = {
+            "applicant_experience": row["applicant_experience"].split(" "),  # Assuming applicant_experience is a string
+            "applicant_job_role": row["applicant_job_role"],
+            "applicant_skills": row["applicant_skills"].split(" "),  # Split skills by space
+            "education": "Unknown"  # Assuming no education data in this case
+        }
+        
+        job = {
+            "job_role": row["job_role"],
+            "job_skills": row["job_skills"].split(" "),  # Split required skills by space
+            "job_responsibilities": row["job_responsibilities"]
+        }
+        
+        # Compute the match scores for each resume-job description pair
+        match_scores = compute_match_scores(resume, job)
+        
+        match_results.append({
+            "Resume Job Role": row["applicant_job_role"],
+            "Resume Experience": row["applicant_experience"],
+            "Resume Skills": row["applicant_skills"],
+            "Job Title": row["job_role"],
+            "Job Description": row["job_description"],
+            "Job Skills": row["job_skills"],
+            "Job Responsibilities": row["job_responsibilities"],
+            "Job Title Match": match_scores['job_title_match_score'],
+            "Skills Match": match_scores['skills_match_score'],
+            "Responsibilities Match": match_scores['responsibilities_match_score']
+        })
+    
+    # Convert the match results into a DataFrame
+    match_results_df = pd.DataFrame(match_results)
+    match_results_df.to_csv(output_file_path, index=False)
+    
+    print(f"Final dataset with match scores saved to {output_file_path}")
+    return match_results_df
+
+
+
+# Calculate the match scores for all resume-job description pairs
+compute_match_scores_for_combined_data(final_combined_df, "final dataset")
+
+
+
+
