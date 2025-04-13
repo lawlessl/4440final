@@ -104,10 +104,15 @@ def compute_skills_match(job, resume):
     return skills_match
 
 def compute_responsibilities_match(job, resume):
-    """Compute the responsibilities match score."""
-    responsibilities_in_job = job.get("job_responsibilities", "")
-    job_bullets_in_resume = " ".join(resume["applicant_experience"])  # Assuming it's a list of strings in resume['applicant_experience']
-    return responsibilities_similarity(responsibilities_in_job, job_bullets_in_resume)
+    """Compute the responsibilities match score using both job responsibilities and job description."""
+    responsibilities = job.get("job_responsibilities", "")
+    description = job.get("job_description", "")
+    
+    # Combine job responsibilities + job description
+    combined_job_text = f"{description} {responsibilities}"
+    
+    job_bullets_in_resume = " ".join(resume["applicant_experience"])
+    return responsibilities_similarity(combined_job_text, job_bullets_in_resume)
 
 def compute_match_scores(resume, job):
     """Compute the match scores for job title, skills, and responsibilities."""
