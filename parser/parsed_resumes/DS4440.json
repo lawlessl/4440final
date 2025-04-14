@@ -1,0 +1,118 @@
+{
+  "profile": {
+    "name": "Liam Lawless",
+    "email": "lawless.l@northeastern.edu",
+    "phone": "(617)875-5972",
+    "location": "Boston, MA",
+    "url": "",
+    "summary": ""
+  },
+  "educations": [
+    {
+      "school": "Northeastern University",
+      "degree": "Boston, MA",
+      "gpa": "",
+      "date": "May 2025",
+      "descriptions": [
+        "RelevantCourses: Algorithms & Data Structures, Object-Oriented Design, Database Design, Computer Systems, Systems",
+        "Security, Machine Learning & Data Mining, Artificial Intelligence, Engineering LLM Systems, Software Engineering"
+      ]
+    }
+  ],
+  "workExperiences": [
+    {
+      "company": "MORSECorp",
+      "jobTitle": "Data Science Co-op",
+      "date": "January 2024–June 2024",
+      "descriptions": [
+        "Developed, tested and optimized machine learning models for target tracking and overheadimagery analysis, assessing performance through statistical analyses to improve accuracy and operational effectiveness",
+        "Collaborated with cross-functional teams to define, design, and ship new features for the United States DoD",
+        "Performed in-depth data analysis to evaluate model performance, assess metadata impact, and develop performance metrics, leveraging Python and SQL to create visualizations for client and internal presentations",
+        "Refactored a high-volume image processing pipeline handling millions of images, implementing parallel processing and optimized algorithms for computing image quality metrics, reducing runtime by over 80%"
+      ]
+    },
+    {
+      "company": "Vision Technologies",
+      "jobTitle": "Software Engineering Intern",
+      "date": "June2022–November 2022",
+      "descriptions": [
+        "Developed software, ensuredquality assurance, managed company data, and assisted with on-site installations",
+        "Created software leveraging facial recognition with conference cameras to keep the speaker centered in frame",
+        "Upgraded telecom and audiovisual infrastructure at the U.S. Senate Office Buildings and FDIC Arlington office",
+        "Engaged in weekly team programming meetings to effectively communicate performance and project progression"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "project": "NEUoverflow",
+      "date": "September2024–January 2025",
+      "descriptions": [
+        "Built a university Q&A web application inTypescript using React, MongoDB, and Express.js to build RESTful APIs",
+        "Worked in an Agile development team, participating in sprint planning, stand-ups, and iterative development",
+        "Engineeredsecure user authentication with JWT and bcrypt, enhancing platform security and access control"
+      ]
+    },
+    {
+      "project": "Fitness Analysis Tool",
+      "date": "June2024–August 2024",
+      "descriptions": [
+        "Developed a data-driven fitness web application using React and Firebase for in-depth data analysis",
+        "Designed and implemented comprehensive visualizations of heartrate variability, power output, and cadence using D3.js, enabling users to explore detailed insights into their cycling and running fitness performance"
+      ]
+    },
+    {
+      "project": "AI Natural Selection Simulator",
+      "date": "September2023–December2023",
+      "descriptions": [
+        "Created a generational simulation using Python tovisualize the evolution of traits in an agent-based environment",
+        "Implemented a Q-learning model, effectively training agents using TensorFlow and Keras to iteratively run through thousands of episodes, optimizing agent decision making based on a state-action space",
+        "Visualized results of each simulation with a suite of Matplotlib graphs to measure program performance over time"
+      ]
+    },
+    {
+      "project": "Command Line Shell",
+      "date": "February2023–May 2023",
+      "descriptions": [
+        "Collaborated with team members to plan, prototype, and design a functional Unix shell inthe C language",
+        "Developed and optimized features with a focus on scalability and extensibility, utilizing modular code"
+      ]
+    }
+  ],
+  "skills": {
+    "featuredSkills": [
+      {
+        "skill": "",
+        "rating": 4
+      },
+      {
+        "skill": "",
+        "rating": 4
+      },
+      {
+        "skill": "",
+        "rating": 4
+      },
+      {
+        "skill": "",
+        "rating": 4
+      },
+      {
+        "skill": "",
+        "rating": 4
+      },
+      {
+        "skill": "",
+        "rating": 4
+      }
+    ],
+    "descriptions": [
+      "Languages: Python, C, Java, Typescript, JavaScript, SQL, HTML, CSS",
+      "Systems: macOS, Linux, Windows",
+      "Applications: Git, Visual Studio Code, MongoDB, Postman, Burp Suite, Ghidra, IDA Pro"
+    ]
+  },
+  "custom": {
+    "descriptions": []
+  }
+}
