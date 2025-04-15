@@ -5,7 +5,8 @@ import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 //pdfjs.GlobalWorkerOptions.workerSrc = '';
 
 import path from 'path';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+//import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { TextItem as PdfjsTextItem } from 'pdfjs-dist/types/src/display/api.js';
 import { fileURLToPath } from 'url';
 import type { TextItem, TextItems } from './types';
