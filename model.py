@@ -1,112 +1,106 @@
-import json
-from sentence_transformers import SentenceTransformer
+import os
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+
+from transformers import BertModel, BertTokenizer
+import pandas as pd
+import torch
+import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import root_mean_squared_error
-from mock_data import generate_job_posting, generate_resume
-import numpy as np
+from builtins import round
+import pandas as pd
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+def predict_suitability(model, tokenizer, jd_text, resume_text, device):
+    model.eval()
 
-# Load the job match JSON from generated files
-with open('4440final/job_match.json', 'r') as f:
-    job_match = json.load(f)
+    encoding = tokenizer(
+        jd_text, resume_text,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=512
+    )
 
-def resume_to_text(resume):
-    exp_str = "\n".join([f"{e['title']} at {e['company']} ({e['start_year']}-{e['end_year']})" for e in resume["experience"]])
-    skills = ", ".join(resume["skills"])
-    return f"{resume['education']}\nSkills: {skills}\nExperience:\n{exp_str}"
+    input_ids = encoding["input_ids"].to(device)
+    attention_mask = encoding["attention_mask"].to(device)
 
-def job_to_text(job):
-    skills = ", ".join(job["required_skills"])
-    return f"{job['title']}\nRequired Skills: {skills}\nExperience: {job['minimum_experience']} years\nEducation: {job['required_education']}"
+    with torch.no_grad():
+        output = model(input_ids=input_ids, attention_mask=attention_mask)
 
-def prepare_dataset(data):
-    resume_texts = [resume_to_text(d["resume"]) for d in data]
-    job_texts = [job_to_text(d["job"]) for d in data]
-    pairs = [r + "\n\n" + j for r, j in zip(resume_texts, job_texts)]
-    embeddings = model.encode(pairs)
-    labels = [d["label"] for d in data]
-    return np.array(embeddings), np.array(labels)
-
-X, y = prepare_dataset(job_match)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-
-regressor = RandomForestRegressor()
-regressor.fit(X_train, y_train)
-
-preds = regressor.predict(X_test)
-print("RMSE:", root_mean_squared_error(y_test, preds))
+    return output.item()
 
 
+# Make the model
+class JobFitModel(nn.Module):
+    def __init__(self):
+        super(JobFitModel, self).__init__()
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        self.ffn = nn.Sequential(
+            nn.Linear(768, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
 
 
-def detect_risks(resume):
-    risks = []
-    exp = sorted(resume["experience"], key=lambda x: x["start_year"])
-    for i in range(1, len(exp)):
-        gap = exp[i]["start_year"] - exp[i-1]["end_year"]
-        if gap > 1:
-            risks.append(f"Employment gap of {gap} years between {exp[i-1]['company']} and {exp[i]['company']}")
-    if len(exp) >= 3 and all((exp[i]["end_year"] - exp[i]["start_year"]) <= 1 for i in range(len(exp))):
-        risks.append("Frequent job-hopping detected")
-    return risks
+    def forward(self, input_ids, attention_mask):
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        cls_embedding = outputs.last_hidden_state[:, 0, :]  # Grab [CLS] token
+        score = self.ffn(cls_embedding)
+        return score.squeeze(1)  # Return shape: (batch_size,)
+
+def get_uploaded_match_scores():
+    # Load the bert tokenizer
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    title_model = JobFitModel()
+    skills_model = JobFitModel()
+    resp_model = JobFitModel()
+
+    title_model.load_state_dict(torch.load("title_model.pt", map_location=device))
+    skills_model.load_state_dict(torch.load("skills_model.pt", map_location=device))
+    resp_model.load_state_dict(torch.load("resp_model.pt", map_location=device))
+
+    title_model.to(device).eval()
+    skills_model.to(device).eval()
+    resp_model.to(device).eval()
 
 
+    # Load your CSV
+    df = pd.read_csv("combined_data.csv")
+    df.columns = df.columns.str.strip()
 
-def evaluate_candidate(resume, job):
-    combined = resume_to_text(resume) + "\n\n" + job_to_text(job)
-    embedding = model.encode([combined])
-    score = regressor.predict(embedding)[0]
-    risks = detect_risks(resume)
-    return {
-        "fit_score": round(score, 2),
-        "risk_flags": risks
-    }
+    # Create empty columns to store scores
+    df["Title Match Score"] = 0.0
+    df["Skills Match Score"] = 0.0
+    df["Responsibilities Match Score"] = 0.0
+    df["Overall Suitability Score"] = 0.0
 
-# resume = generate_resume()
-# job = generate_job_posting()
+    # Loop through each row and compute scores
+    for i, row in df.iterrows():
+        job_title = str(row["job_role"])
+        job_skills = str(row["job_skills"])
+        job_responsibilities = str(row["job_responsibilities"])
+        job_description = str(row["job_description"])
 
-job = {
-  "title": "Hydroelectric Plant Technician",
-  "required_skills": ["Equipment Maintenance", "Operation Monitoring", "Mechanical Knowledge", "Critical Thinking"],
-  "minimum_experience": 4,
-  "required_education": "Engineering"
-}
+        resume_role = str(row["applicant_job_role"])
+        resume_skills = str(row["applicant_skills"])
+        resume_experience = str(row["applicant_experience"])
 
-resume = {
-  "name": "Kendra Patel",
-  "email": "kendrapatel92@example.org",
-  "education": "Mechanical Engineering",
-  "skills": ["Operation Monitoring", "Mechanical Knowledge", "Equipment Maintenance", "Critical Thinking", "Troubleshooting", "Monitoring", "Coordination", "Repairing"],
-  "experience": [
-    {
-      "title": "Power Plant Operator",
-      "company": "EverGreen Energy Systems",
-      "start_year": 2021,
-      "end_year": 2025,
-      "skills": ["Operation Monitoring", "Mechanical Knowledge", "Repairing"]
-    },
-    {
-      "title": "Industrial Machinery Mechanic",
-      "company": "Nexus HydroTech",
-      "start_year": 2018,
-      "end_year": 2021,
-      "skills": ["Equipment Maintenance", "Troubleshooting", "Critical Thinking", "Coordination"]
-    },
-    {
-      "title": "Maintenance Technician",
-      "company": "Cascade Utilities Corp.",
-      "start_year": 2016,
-      "end_year": 2018,
-      "skills": ["Repairing", "Monitoring", "Mechanical Knowledge"]
-    }
-  ]
-}
+        responsibilities_input = job_responsibilities + " " + job_description
 
+        title_score = predict_suitability(title_model, tokenizer, job_title, resume_role, device)
+        skills_score = predict_suitability(skills_model, tokenizer, job_skills, resume_skills, device)
+        resp_score = predict_suitability(resp_model, tokenizer, responsibilities_input, resume_experience, device)
 
-print(job, '\n\n', resume)
+        df.at[i, "Title Match Score"] = title_score
+        df.at[i, "Skills Match Score"] = skills_score
+        df.at[i, "Responsibilities Match Score"] = resp_score
+        df.at[i, "Overall Suitability Score"] = round((0.25 * title_score) + (0.33 * skills_score) + (0.37 * resp_score), 4)
 
-result = evaluate_candidate(resume, job)
-print(json.dumps(result, indent=2))
+    return df

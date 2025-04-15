@@ -1,4 +1,5 @@
 from parser.parse_resume import parse_resume
+from model import get_uploaded_match_scores
 import os
 import csv
 
@@ -35,6 +36,11 @@ def main():
         writer.writerows(combined_data)
 
     print(f"Combined data saved as {output_file}")
+
+    df = get_uploaded_match_scores()
+
+    return df
+    
 
 if __name__ == "__main__":
     main()

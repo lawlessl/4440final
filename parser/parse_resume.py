@@ -6,8 +6,8 @@ import time
 
 def parse_resume(file_name, pdf_path):
     # Command to run the TypeScript parser
-    command = ["npx", "ts-node", "parser/lib/run.ts", pdf_path]
-    output_dir = "parser/parsed_resumes"
+    command = ["npx", "ts-node", "/Users/liamlawless/Desktop/Northeastern/2024-2025 School Year/DS4440/4440final/parser/lib/run.ts", pdf_path]
+    output_dir = "/Users/liamlawless/Desktop/Northeastern/2024-2025 School Year/DS4440/4440final/parser/parsed_resumes"
 
     try:
         # Run the TS script
